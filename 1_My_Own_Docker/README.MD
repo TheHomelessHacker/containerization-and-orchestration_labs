@@ -110,10 +110,10 @@ ps -o pid,user,cmd -p 7678
 и увидел, что снаружи mark, внутри root
 
 ## ДО/ПОСЛЕ
-| Параметр | На хосте (до) | В namespace (после) |
+| Параметр |   На хосте    |    В namespace      |
 |----------|---------------|---------------------|
 | hostname | dockerkuber | mynamespace |
-| id | uid=1000(mark) | uid=0(root) |
+| id | uid=7678(mark) | uid=0(root) |
 | ps aux | ~50 процессов | только bash, ps |
 | ip a | ens33, lo | только lo |
 
