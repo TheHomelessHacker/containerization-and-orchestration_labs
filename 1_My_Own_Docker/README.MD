@@ -126,3 +126,70 @@ ps -o pid,user,cmd -p 7678
 - **UTS** — свой hostname;
 - **IPC** — свои очереди и семафоры;
 - **User** — root внутри, обычный пользователь снаружи; capabilities ограничены namespace.
+
+# Часть 3 — cgroups
+
+## 3.1 cgroups (Введение)
+1) Группы находятся по пути `ls /sys/fs/cgroup/`
+2) Создание - `sudo mkdir /sys/fs/cgroup/mycgroup`
+! Ядро автоматически создаёт внутри неё все файлы управления.
+3) Добавление процесса в cgroup - `echo <PID> | sudo tee /sys/fs/cgroup/mycgroup/cgroup.procs`
+! Файлы в /sys/fs/cgroup/ — это интерфейсы ядра, а не обычные текстовые конфиги. Их содержимое — не «настройки в человекочитаемом виде», а сигналы ядру: «добавь этот PID в группу», «установи лимит памяти X байт» и т.д. Поэтому если при создании (touch) и заполнении (nano) файла не через однократную запись (через echo | tee), то поведение будет непредсказуемым: ядро может отвергнуть запись, интерпретировать её иначе или вообще не считать это «командой».
+4) Задать лимит, например для RAM - `echo "100M" | sudo tee /sys/fs/cgroup/mycgroup/memory.max` или можно через systemd в unit-файлах
+5) Просмотр имеющихся ограничений - `cat /sys/fs/cgroup/mycgroup/` и выбрать, что нужно посмотеть
+
+## 3.2 Выполнение
+Буду выполнять через cgroup-менеджер systemd 
+Когда systemd запускает сервис (unit), он автоматически создаёт для него cgroup по пути `/sys/fs/cgroup/system.slice/api.service/`, внутри — те же самые файлы (memory.max, cpu.max, pids.max, cgroup.procs), просто systemd создал их сам, не придется делать это вручную
+1) Создание unit-файла - `sudo nano /etc/systemd/system/api.service`
+2) Заполнить unit-файл (9.png)
+3) Перезагрузить конфиг systemd - `sudo systemctl daemon-reload`
+4) Запустить сервис - `sudo systemctl start api.service`
+5) Проверка - `sudo systemctl status api.service`
+
+**Проверка** (10.png)
+- Сервис запущен и все endpoint работают
+- cgroup создано автоматически
+- Все файлы созданы без лимитов со значением "max"
+
+## 3.3 Ограничение по памяти
+1) Редактирую код unit файла, написнного ранее. Добавляю лимит памяти 200 МБ и запрет swap, для того, чтобы при нахватке памяти процесс не брал запасную память (swap) и сразу сработало ООМ (11.png)
+2) Перезапустить daemon-reload, сервис, потом проверить его статус
+3) Проверка, что лимиты применились (12.png)
+-> Лимиты по ограничению памяти применены
+4) Проверка на деле
+- Запомнил текущее состояние memory.events (14.png): 
+```cat /sys/fs/cgroup/system.slice/api.service/memory.events```
+Пока все счетчики 0. Далее отловить не смог, так как после заврещения работы сервис все удалеят и автоматически удалятся и memory.events. Но через логи все равно можно увиеть причину заверешения
+- Вызвать /eat больше чем лимит
+```
+curl "http://localhost:8080/eat?mb=250"
+curl: (52) Empty reply from server
+```
+5) Провека шага "4)"
+- Проверка, что сервис убит ``sudo systemctl status api.service`` (13.png)
+
+По логам 
+```
+Sep 26 17:39:57 dockerkuber systemd[1]: api.service: Main process exited, code=killed, status=9/KILL
+
+Sep 26 17:39:57 dockerkuber systemd[1]: api.service: Failed with result 'oom-kill'." 
+```
+можно скащать, что сервис был завершён (status=9/KILL) по причине нахватки памяти (oom-kill)
+
+- Логи journal, dmesg (15.png)
+По ним тоже можно увидеть, что сервис заврешил работу из-за нехватки памяти 
+```
+Sep 26 17:39:57 dockerkuber systemd[1]: api.service: A process of this unit has been killed by the OOM killer.
+Sep 26 17:39:57 dockerkuber systemd[1]: api.service: Main process exited, code=killed, status=9/KILL
+Sep 26 17:39:57 dockerkuber systemd[1]: api.service: Failed with result 'oom-kill'.
+
+[23347.697803] oom-kill:constraint=CONSTRAINT_MEMCG,nodemask=(null),cpuset=api.service,mems_allowed=0,oom_memcg=/system.slice/api.service,task_memcg=/system.slice/api.service,task=api,pid=14828,uid=0
+[23347.697829] Memory cgroup out of memory: Killed process 14828 (api) total-vm:1937240kB, anon-rss:203776kB, file-rss:5504kB, shmem-rss:0kB, UID:0 pgtables:560kB oom_score_adj:0
+```
+
+!! systemd подписывается на события cgroup (`/sys/fs/cgroup/system.slice/api.service/memory.events`), на журнал, видит инкремент oom_kill в memory.events и делает вывод «это был OOM».
+
+!! После того, как сервис упал Linux удалил созданную cgroups (16.png), так как, чтобы не деражть мусор в ядре, а также cgroup — это контейнер для процессов. Без процессов cgroup пуста, а значит бессмысленна.
+
+## 3.4 Ограничение по памяти
