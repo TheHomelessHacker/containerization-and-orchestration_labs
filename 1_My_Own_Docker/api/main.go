@@ -69,3 +69,5 @@ func burnHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "burning\n")
 	fmt.Println("on URL /burnin, burnin")
 }
+
+// add comment for cache
