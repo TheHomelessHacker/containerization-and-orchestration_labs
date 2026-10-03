@@ -333,7 +333,7 @@ Capabilities и seccomp — **разные слои**:
 1) Написание скрипта
 **Ключевые принципы**
 - Разделение запуска (от mark) и добавления в cgroup (от root) — чтобы получить «иллюзию власти».
-- Все механизмы применяются **до** exec на api: unshare → setpriv → myseccomp → api.
+- Все механизмы применяются **до** exec на api: unshare -> setpriv -> myseccomp -> api.
 - Очистка старого состояния в начале скрипта: pkill старых api + rmdir cgroup.
 
 2) Проверка
@@ -412,10 +412,10 @@ Capabilities и seccomp — **разные слои**:
 -> capabilities и Seccomp применились
 
 -> новый порядок запуска:
-- unshare → попадаем в namespace.
-- setpriv → срезаем capabilities.
-- myseccomp → применяет seccomp.
-- api → запускается с фильтром и без caps.
+- unshare -> попадаем в namespace.
+- setpriv -> срезаем capabilities.
+- myseccomp -> применяет seccomp.
+- api -> запускается с фильтром и без caps.
 
 ## Блок B - docker run
 1. Возьму готовый nginx и запущу с теми же лимитами
@@ -429,8 +429,9 @@ Capabilities и seccomp — **разные слои**:
 
 **Анализ**
 
-Мой скрипт: memory.max = 209715200, Docker: "Memory": 209715200 — совпадает.
-Мой скрипт: CapEff = 0x400 (только net_bind_service), Docker: CapPrm = 0xa80425fb (~14 caps) — Docker оставляет больше.
+- Мой скрипт: memory.max = 209715200, Docker: "Memory": 209715200 — совпадает.
+
+- Мой скрипт: CapEff = 0x400 (только net_bind_service), Docker: CapPrm = 0xa80425fb (~14 caps) — Docker оставляет больше.
 
 **Таблица сравнения**
 | Механизм | `mydocker.sh` | `docker run` |
@@ -520,9 +521,9 @@ Capabilities и seccomp — **разные слои**:
 
 **Анализ:**
 Сценарий 1 (без volume):
-- docker cp c1:/data.txt /tmp/check1.txt вывело hello
-- docker stop c1 && docker rm c1 -> контейнер удалён
-- docker cp c2:/data.txt /tmp/check2.txt -> Could not find the file /data.txt
+- `docker cp c1:/data.txt /tmp/check1.txt` вывело hello
+- `docker stop c1 && docker rm c1` -> контейнер удалён
+- `docker cp c2:/data.txt /tmp/check2.txt` -> Could not find the file /data.txt
 
 -> **Файл пропал. Это доказательство, что без volume данные живут только в upperdir контейнера.**
 
@@ -531,7 +532,7 @@ Capabilities и seccomp — **разные слои**:
 - `docker stop c3 && docker rm c3` -> контейнер удалён
 - `docker cp c4:/data/file.txt /tmp/check4.txt` -> hello
 
--> **Файл сохранился. Volume пережил удаление контейнера**, так как Volume - отдельный ресурс Docker, физически лежит в /var/lib/docker/volumes/mydata/_data/, вне слоёв контейнера. Контейнер монтирует его поверх /data. При docker rm удаляется upperdir контейнера, а volume остаётся — Docker не удаляет volumes автоматически, потому что в них могут быть ценные данные**
+-> **Файл сохранился. Volume пережил удаление контейнера**, так как Volume - отдельный ресурс Docker, физически лежит в `/var/lib/docker/volumes/mydata/_data/`, вне слоёв контейнера. Контейнер монтирует его поверх /data. При docker rm удаляется upperdir контейнера, а volume остаётся — Docker не удаляет volumes автоматически, потому что в них могут быть ценные данные**
 
 **Почему сработало?**
 docker cp идёт через Docker API, а не через shell внутри контейнера. Ему не нужны sh, cat, ls в образе. Он работает на уровне файловой системы контейнера.
