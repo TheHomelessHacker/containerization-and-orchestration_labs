@@ -1,0 +1,11 @@
+kubectl
+kind
+get_helm.sh
+
+api/api
+*.test
+
+.vscode/
+.idea/
+
+*.log
