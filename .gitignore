@@ -2,7 +2,8 @@ kubectl
 kind
 get_helm.sh
 
-api/api
+2_Service_monitoring/api/api
+1_My_Own_Docker/api/api
 *.test
 
 .vscode/
