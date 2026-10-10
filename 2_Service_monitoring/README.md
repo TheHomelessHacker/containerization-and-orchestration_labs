@@ -93,3 +93,84 @@
 
 ![](screenshots/part_0/11.png)
 - Сервис запущен, логи собираются и выводятся в JSON формете
+
+# Часть 1 — Метрики (Prometheus + Grafana)
+
+1. Установка и нстройка kube-prometheus-stack 
+1) Доавить репозиторий, было сделано ранее
+2) Созданю отдельный namespace для мониторинга ` kubectl create namespace monitoring`, так как мониторинг — отдельный слой, не мешается с приложениями. Плюс RBAC (права) удобнее настраивать.
+3) настройка values
+- Будут урезаны:
+    - `Стандартные дашборды` - оставлены только основыне
+    - `kube-proxy, kube-etcd метрики` - отключены
+    - Prometheus retention — с 10 дней до 2–3 дня
+    - rometheus resources —  1+ ГБ -> 512 МБ.
+    - Grafana resources — 200 МБ → 128 МБ.
+    - Alertmanager resources — 100 МБ → 64 МБ.
+
+2.  Values для kube-prometheus-stack
+1) Создагние `helm/monitoring/values.yaml` — файл с настройками для kube-prometheus-stack
+2) Установка 
+helm install kps prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  -f helm/monitoring/values.yaml
+3) Проверка
+![](screenshots/part_1/12.png)
+
+Анализ
+- Все поды запущены
+- Место для храния данных PVC создано
+- все ClusterIP с портами.
+
+4. ServiceMonitor для api
+1) Проблема: Prometheus живёт в monitoring, а api — в default, а kube-prometheus-stack ищет ServiceMonitor'ы только в своём namespace -> api виден не будет, нужно в values поставить
+- serviceMonitorSelector: {} — видеть все ServiceMonitor'ы
+- serviceMonitorNamespaceSelector: {} — искать их во всех namespace.
+2) Обновить релиз 
+```
+helm upgrade kps prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  -f helm/monitoring/values.yaml
+```
+3) Создание ServiceMonitor для api в отдельном файле — не в чарте kube-prometheus-stack, а в своём чарте для api, так как ServiceMonitor — часть приложения, а не мониторинга.
+! ServiceMonitor создается в том же namespace, что и релиз api
+4) Проверка
+- Нужно было добавить имя для Service, так как ServiceMonitor требует port как строку — имя порта. Не число, потому что у Service может быть несколько портов, и Prometheus должен знать, какой именно скрейпить.
+![](screenshots/part_1/13.png)
+Анализ
+- helm чарт обновлен и имеет версии 3
+- servicemonitor создан верно 
+    - Port: http
+    - Path: /metrics.
+    - Interval: 30s.
+    - Selector: App: api
+
+5. Проверка, что Prometheus видит цель
+1) Открою Prometheus UI через port-forward
+2) Проверю список всех целей
+! В списке job'ов есть все системные (serviceMonitor/monitoring/kps-...), но нет serviceMonitor/default/api-api/0. Значит, Prometheus не подхватил твой ServiceMonitor.
+Проблема была в том, что в kube-prometheus-stack есть скрытый параметр — serviceMonitorSelectorNilUsesHelmValues. По умолчанию он true, и это значит,что если не задать serviceMonitorSelector явно, то будет использоваьбся matchLabels: release: <имя-релиза>». (serviceMonitorSelector.matchLabels.release: kps)
+
+![](screenshots/part_1/14.png)
+После изменений Prometheus видит цель
+```
+"job":"serviceMonitor/default/api-api/0"
+"job":"api-api"
+```
+
+![](screenshots/part_1/15.png)
+- 1 / 1 up — зелёный кружок, цель доступна.
+
+![](screenshots/part_1/16.png)
+метрики собираются, JSON применился
+
+![](screenshots/part_1/17.png)
+Встроенный HTTP API Prometheu в статусе "up = 1" -> target доступен. Через него можно выполнять PromQL-запросы и получать результаты в JSON. Благодря нему через браузер можно видишь графики на http://localhost:9090/graph
+
+**-> Prometheus видит твой сервис, скрейпит /metrics, метрики с правильными labels.**
+
+6. Подключение Grafana к Prometheus
+1) kube-prometheus-stack автоматически подключает Grafana к Prometheus как datasource
+2) 
+
+

@@ -9,6 +9,7 @@ spec:
   selector:
     app: api
   ports:
-  - port: {{ .Values.service.port }}
+  - name: http # нужно для связи с ServiceMonitor 
+    port: {{ .Values.service.port }}
     targetPort: 8080
     protocol: TCP
