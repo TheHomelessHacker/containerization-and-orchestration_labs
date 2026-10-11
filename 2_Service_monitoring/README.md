@@ -171,6 +171,61 @@ helm upgrade kps prometheus-community/kube-prometheus-stack \
 
 6. Подключение Grafana к Prometheus
 1) kube-prometheus-stack автоматически подключает Grafana к Prometheus как datasource
-2) 
+2) Проверка
+![](screenshots/part_1/18.png)
+![](screenshots/part_1/19.png)
+-> Grafana доступна, datasource - Prometheus b он работает
+
+7. RED-дашборд
+1. Создание через панелей для Дашборда через UI
+1) Пролбемы:
+- Нестабильность соединения. kubectl port-forward плохо работает с WebSocket-соединениями, которые Grafana 
+использует для live-обновлений. Туннель периодически рвётся с ошибкой:
+   "error forwarding port 3000 ... connection reset by peer"
+
+Решение:
+- Использовать nohup + лог в файл вместо интерактивного запуска:
+  nohup kubectl port-forward -n monitoring svc/kps-grafana 3000:80 \
+    --address='0.0.0.0' > /tmp/pf-grafana.log 2>&1 &
+- Пробросить порт через VS Code Port Forwarding (вкладка Ports) — это 
+  стабильнее, чем kubectl port-forward напрямую.
+- При обрыве — F5 в браузере или перезапуск port-forward.
+2) Изначально лимит памяти Grafana был 256Mi — она постоянно падала с OOMKilled(10 рестартов за час). При перезапуске пода терялись несохранённые изменения дашборда.
+
+Решение:
+- Увеличить лимиты Grafana до 512Mi в values.yaml.
+- После этого под стабилизировался, рестарты прекратились.
+
+-> Для учебного стека в kind kubectl port-forward + VS Code Ports — приемлемое решение. В проде для Grafana используют Ingress или LoadBalancer — они не зависят от локального туннеля.
+
+
+Первая панель RPS
+![](screenshots/part_1/22.png)
+Вторая панель ERROR
+![](screenshots/part_1/23.png)
+Третья панель p95
+![](screenshots/part_1/24.png)
+
+Состояние до 
+![](screenshots/part_1/21.png)
+
+Дернул данные
+![](screenshots/part_1/22.png)
+Анализ
+- Rate (RPS) — поднимается с 0 до 0.3 req/s — это мои запросы. 
+- Error Rate — прыгает с 0 до 27% — это /fail.
+- Duration p95 — взлетает с 0 до 1.6 сек — это /slow.
+-> RED-дашборд полностью работает. Все три метрики реагируют на эндпоинты, как и требовалось в задании.
+
+После ручной сборки панелей в UI:
+1. Экспортировал JSON дашборда
+2. Сохранил в helm/monitoring/dashboards/RED.json.
+3. Создал ConfigMap с меткой, которую подхватывает Grafana:
+   kubectl create configmap red-dashboard -n monitoring \
+     --from-file=red.json=.../red.json
+   kubectl label configmap red-dashboard -n monitoring grafana_dashboard=1
+4. Grafana sidecar автоматически находит ConfigMap'ы с этой меткой 
+   и создаёт дашборды при старте.
+![](screenshots/part_1/25.png)
 
 

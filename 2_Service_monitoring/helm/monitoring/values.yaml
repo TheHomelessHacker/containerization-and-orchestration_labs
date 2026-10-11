@@ -1,6 +1,6 @@
 prometheus:
   prometheusSpec:
-    retention: 2d
+    retention: 6h
     serviceMonitorSelector: {}
     serviceMonitorNamespaceSelector: {}
     serviceMonitorSelectorNilUsesHelmValues: false
@@ -25,10 +25,10 @@ grafana:
   adminPassword: "admin"
   resources:
     requests:
-      memory: 128Mi
+      memory: 256Mi
       cpu: 100m
     limits:
-      memory: 256Mi
+      memory: 512Mi
       cpu: 200m
   
   # TODO: отключить лишние дашборды? Пока оставь — пригодятся
@@ -60,4 +60,13 @@ kubeProxy:
 kubeScheduler:
   enabled: false
 kubeControllerManager:
+  enabled: false
+
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+coreDns:
   enabled: false
