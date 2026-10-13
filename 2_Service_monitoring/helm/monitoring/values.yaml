@@ -35,14 +35,13 @@ grafana:
   # adminPassword: "prom-operator"  # по умолчанию это
   service:
     type: ClusterIP  # доступ через port-forward
-  # TODO: persistence — для лабы можно false (данные Grafana не критичны)
+  # persistence — для лабы можно false (данные Grafana не критичны)
   persistence:
     enabled: false
 
 
 alertmanager:
   alertmanagerSpec:
-    # TODO: ресурсы (requests 64Mi/50m, limits 128Mi/100m)
     resources:
       requests:
         memory: 64Mi

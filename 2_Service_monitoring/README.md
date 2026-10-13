@@ -228,4 +228,53 @@ helm upgrade kps prometheus-community/kube-prometheus-stack \
    и создаёт дашборды при старте.
 ![](screenshots/part_1/25.png)
 
+# Часть 2 — Логи (Loki + Grafana)
+1. Добавь репозиторий Grafana
+1) 
+`helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+`
+![](screenshots/part_1/26.png)
 
+2) 
+Проверка чартов
+`helm search repo grafana/loki`
+Вывело
+![](screenshots/part_1/27.png)
+
+3) Для работы выберу loki, так как это современный чарт, поддерживает режимы: SingleBinary, SimpleScalable, Distributed. Для лабы буду использовать SingleBinary (всё в одном поде).
+
+2. Реализация
+1) Создал `values.yaml` для натсройки Loki
+2) Установка и проверка
+![](screenshots/part_1/28.png)
+![](screenshots/part_1/29.png)
+-> Поды запщены и Loki готов к работе
+
+3. Grafana Alloy
+1) Создал `values.yaml` для натсройки
+2) Установка и проверка
+![](screenshots/part_1/30.png)
+Установлен, поды запущены
+
+![](screenshots/part_1/31.png)
+Всё, что настраивалось в `discovery.relabel` — на месте. Alloy собирает логи и отправляет в Loki.
+
+![](screenshots/part_1/32.png)
+-> Логи api дошли до Loki, цепочка работает: api → stdout → containerd → Alloy → Loki.
+
+
+![](screenshots/part_1/33.png)
+Собитие fail было залогировано
+
+4. Подключение Loki к Grafana
+1) Идем `ttp://localhost:3000`
+2) Во вклдке "Data sources" добавить Loki и уыидеть `Data source successfully connected.`
+3) Проверка
+![](screenshots/part_1/34.png)
+Анализ
+- JSON разложен по полям — time, level, msg, path, status, total_errors
+- Уровни подсвечены — INFO, WARN
+- Фильтр работает — видим только логи /fail
+
+-> api → stdout → containerd → Alloy (DaemonSet) → Loki → Grafana Explore.
