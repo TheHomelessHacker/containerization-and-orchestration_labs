@@ -234,47 +234,132 @@ helm upgrade kps prometheus-community/kube-prometheus-stack \
 `helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
 `
-![](screenshots/part_1/26.png)
+![](screenshots/part_2/26.png)
 
 2) 
 Проверка чартов
 `helm search repo grafana/loki`
 Вывело
-![](screenshots/part_1/27.png)
+![](screenshots/part_2/27.png)
 
 3) Для работы выберу loki, так как это современный чарт, поддерживает режимы: SingleBinary, SimpleScalable, Distributed. Для лабы буду использовать SingleBinary (всё в одном поде).
 
 2. Реализация
 1) Создал `values.yaml` для натсройки Loki
 2) Установка и проверка
-![](screenshots/part_1/28.png)
-![](screenshots/part_1/29.png)
+![](screenshots/part_2/28.png)
+![](screenshots/part_2/29.png)
 -> Поды запщены и Loki готов к работе
 
 3. Grafana Alloy
 1) Создал `values.yaml` для натсройки
 2) Установка и проверка
-![](screenshots/part_1/30.png)
+![](screenshots/part_2/30.png)
 Установлен, поды запущены
 
-![](screenshots/part_1/31.png)
+![](screenshots/part_2/31.png)
 Всё, что настраивалось в `discovery.relabel` — на месте. Alloy собирает логи и отправляет в Loki.
 
-![](screenshots/part_1/32.png)
+![](screenshots/part_2/32.png)
 -> Логи api дошли до Loki, цепочка работает: api → stdout → containerd → Alloy → Loki.
 
 
-![](screenshots/part_1/33.png)
+![](screenshots/part_2/33.png)
 Собитие fail было залогировано
 
 4. Подключение Loki к Grafana
 1) Идем `ttp://localhost:3000`
 2) Во вклдке "Data sources" добавить Loki и уыидеть `Data source successfully connected.`
 3) Проверка
-![](screenshots/part_1/34.png)
+![](screenshots/part_2/34.png)
 Анализ
 - JSON разложен по полям — time, level, msg, path, status, total_errors
 - Уровни подсвечены — INFO, WARN
 - Фильтр работает — видим только логи /fail
 
 -> api → stdout → containerd → Alloy (DaemonSet) → Loki → Grafana Explore.
+
+# Часть 3 — Трейсы (OpenTelemetry + Jaeger)
+1. Добавление OTel в код api
+1) Подключил библиотеки
+- otel — API для создания спанов.
+- otel/sdk — реализация SDK (TracerProvider, экспортёры).
+- otlptracegrpc — экспортёр по OTLP/gRPC (в Jaeger).
+- otelhttp — автоматическая инструментация HTTP-сервера.
+2) Поменян фалй для запуска сервиса api
+- Инициализировал OTel `initTracer`
+- Обернул все хендлеры в `otelhttp.NewHandler`
+- В `/slow` — вложенный спан `slow-op`
+-  `/fail` — пометить спан как ошибку
+- В логи добавить `trace_id` — через slog.Handler с OTel
+3) Проверка
+![](screenshots/part_3/35.png)
+-> JSON-логи идут, но OTel работает в no-op режиме `OTEL_EXPORTER_OTLP_ENDPOINT not set, tracing disabled`: спаны создаются локально, никуда не уходят. Поэтому в логах нет trace_id.
+! Сначала Поднять Jaege, чтобы был endpoint, куда слать трейсы и потом добавить OTEL_EXPORTER_OTLP_ENDPOINT в values api
+
+2. Jaeger
+1) Добавил репозиторий 
+`helm repo add jaegertracing https://jaegertracing.github.io/helm-charts`
+2) Создал `values.yaml` для натсройки Jaeger
+3) Установка и проверка
+![](screenshots/part_3/36.png)
+Анализ
+Jaeger работает
+Один сервис jaeger со всеми портами:
+- 4317 — OTLP/gRPC
+- 4318 — OTLP/HTTP
+- 16686 — UI
+- 14250, 14268 — Jaeger native
+- Endpoint для `api: jaeger.monitoring.svc.cluster.local:4317`
+
+![](screenshots/part_3/37.png)
+Jaeger UI тоже тоступен
+
+3. Добавление trace_id 
+1) в helm/api/templates/deployment.yaml нужно добавить env
+`
+env:
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "{{ .Values.otel.endpoint }}"
+`
+2) Обновил values у сервиса, чтобы добавить endpoint параметризуемо
+`
+otel:
+  endpoint: "jaeger.monitoring.svc.cluster.local:4317"
+`
+
+4. Подготовка
+1) После изменения main.go был пересобран Dockerfile
+`docker build -t api-monitoring:latest .`
+2) Загрузка в kind:
+`kind load docker-image api-monitoring:latest --name monitoring`
+3) Обновление Helm-релиза
+`helm upgrade api ./helm/api`
+- Перезапустить под, чтобы подхватил новый образ
+`kubectl rollout restart deployment/api-api -n default`
+- Проверка пода
+`kubectl get pods -n default | grep api` -> status `Running`
+4) Проверка логов
+![](screenshots/part_3/38.png)
+Логи с trace_id и span_id
+
+- Проврека связи
+  - В Grafana выполнил запрос `{app="api"} |= "trace_id"` и поулчаю `trace_id = 5c6197fe23851625d5369f23e91e23eb` /slow запроса
+![](screenshots/part_3/41.png)  
+- вставляю в Jaeger `trace_id` и нахожу тот же трейс.
+  ![](screenshots/part_3/42.png) 
+-> Связь работает, откроется тот же трейс, что я видел из Grafana — GET /slow и slow-op. Только теперь я попал в него из лога.
+
+- Провнрка Jager
+![](screenshots/part_3/39.png)
+Анализ
+
+- GET /fail — с красным статусом 500
+- fail-op — красный ошибочный спан
+- Depth 2, Total Spans 2
+
+![](screenshots/part_3/40.png)
+
+- GET /slow — корневой, 2.0s
+- slow-op — вложенный, ~2.0s (медленная операция внутри)
+- Depth 2, Total Spans 2

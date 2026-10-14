@@ -16,5 +16,8 @@ spec:
       - name: api
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "{{ .Values.otel.endpoint }}"
         ports:
         - containerPort: 8080
