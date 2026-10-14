@@ -4,6 +4,10 @@ prometheus:
     serviceMonitorSelector: {}
     serviceMonitorNamespaceSelector: {}
     serviceMonitorSelectorNilUsesHelmValues: false
+
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
     
     resources:
       requests:
@@ -38,6 +42,15 @@ grafana:
   # persistence — для лабы можно false (данные Grafana не критичны)
   persistence:
     enabled: false
+  
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki-gateway.monitoring.svc.cluster.local
+      isDefault: false
+      jsonData:
+        maxLines: 1000
 
 
 alertmanager:
