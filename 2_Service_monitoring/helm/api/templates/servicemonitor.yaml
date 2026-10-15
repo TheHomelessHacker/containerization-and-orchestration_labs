@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    app: api
+
+spec:
+  selector:
+    matchLabels:
+      app: api
+  endpoints:
+  - port: http # найти тут `kubectl get svc api-api -o yaml`
+    path: /metrics
+    interval: 30s

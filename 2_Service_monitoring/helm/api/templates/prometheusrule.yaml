@@ -1,0 +1,47 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-api-alerts
+  labels:
+    app: api
+spec:
+  groups:
+  - name: api.rules
+    interval: 30s
+    rules:
+    - alert: ApiHighErrorRate
+      expr: |
+        sum(rate(http_requests_total{job="api-api",status=~"5.."}[5m]))
+        /
+        sum(rate(http_requests_total{job="api-api"}[5m]))
+        > 0.05
+      for: 30s
+      labels:
+        severity: critical
+      annotations:
+        summary: "API: высокий процент ошибок"
+        description: "Доля ошибок {{ `{{ $value | humanizePercentage }}` }} за последние 2 минуты"
+
+    - alert: ApiHighLatency
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(http_request_duration_seconds_bucket{job="api-api"}[5m])) by (le)
+        ) > 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "API: высокая задержка p95"
+        description: "p95 latency {{ `{{ $value }}` }}s за последние 2 минуты"
+
+    - alert: ApiDown
+      expr: |
+        (up{job="api-api"} == 0)
+        or
+        absent(up{job="api-api"})
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "API недоступен"
+        description: "Prometheus не может скрейпить api в течение 1 минуты"
