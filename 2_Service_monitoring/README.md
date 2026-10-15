@@ -230,9 +230,12 @@ nohup kubectl port-forward -n monitoring svc/kps-grafana 3000:80 \
 -> Для учебного стека в kind kubectl port-forward + VS Code Ports — приемлемое решение. В проде для Grafana используют Ingress или LoadBalancer — они не зависят от локального туннеля.
 
 Первая панель RPS
+
 ![](screenshots/part_1/dop1.png)
 Вторая панель ERROR
+
 ![](screenshots/part_1/23.png)
+
 Третья панель p95
 ![](screenshots/part_1/24.png)
 
