@@ -4,13 +4,12 @@ metadata:
   name: {{ .Release.Name }}-api
   labels:
     app: api
-    # TODO: нужен ли label release: kps? 
-    # (если serviceMonitorSelector пустой {} — не нужен)
+
 spec:
   selector:
     matchLabels:
       app: api
   endpoints:
-  - port: http # найти тут kubectl get svc api-api -o yaml
+  - port: http # найти тут `kubectl get svc api-api -o yaml`
     path: /metrics
     interval: 30s

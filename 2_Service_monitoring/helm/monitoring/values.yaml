@@ -35,8 +35,6 @@ grafana:
       memory: 512Mi
       cpu: 200m
   
-  # TODO: отключить лишние дашборды? Пока оставь — пригодятся
-  # adminPassword: "prom-operator"  # по умолчанию это
   service:
     type: ClusterIP  # доступ через port-forward
   # persistence — для лабы можно false (данные Grafana не критичны)
@@ -51,7 +49,6 @@ grafana:
       isDefault: false
       jsonData:
         maxLines: 1000
-
 
 alertmanager:
   alertmanagerSpec:

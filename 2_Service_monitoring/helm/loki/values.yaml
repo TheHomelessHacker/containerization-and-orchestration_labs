@@ -29,7 +29,7 @@ singleBinary:
     enabled: true
     size: 5Gi
 
-# Отключаем ненужные в SingleBinary компоненты
+# Отключение ненужных в SingleBinary компонентов
 backend:
   replicas: 0
 read:
@@ -37,7 +37,7 @@ read:
 write:
   replicas: 0
 
-# Отключаем встроенные тесты и canary
+# Отключение встроенных тестов и canary
 test:
   enabled: false
 lokiCanary:

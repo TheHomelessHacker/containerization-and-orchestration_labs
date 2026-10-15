@@ -55,16 +55,16 @@ func (h *otelHandler) WithGroup(name string) slog.Handler {
 
 // === МЕТРИКИ ===
 var (
-	// TODO: создай CounterVec для http_requests_total с метками: method, path, status - READE
+	// CounterVec для http_requests_total с метками: method, path, status - READE
 	httpRequestsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",
 			Help: "Total number of HTTP requests",
 		},
-		[]string{"method", "path", "status"}, // ← метки
+		[]string{"method", "path", "status"}, // метки
 	)
 
-	// TODO: создай HistogramVec для http_request_duration_seconds с метками: method, path - READE
+	// HistogramVec для http_request_duration_seconds с метками: method, path
 	httpRequestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
@@ -86,7 +86,7 @@ func (r *statusRecorder) WriteHeader(code int) {
 }
 
 func init() {
-	// TODO: зарегистрируй метрики в prometheus - READE
+	// Регистрация метрик в prometheus
 	prometheus.MustRegister(httpRequestsTotal)
 	prometheus.MustRegister(httpRequestDuration)
 }
@@ -97,12 +97,10 @@ func metricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		// TODO: создай обёртку над w, чтобы перехватить status code
-		// (стандартный http.ResponseWriter не даёт узнать status после WriteHeader)
-		// Подсказка: struct { http.ResponseWriter; status int } - READE
+		// Обёртка над w, чтобы перехватить status code
 		rec := &statusRecorder{ResponseWriter: w, status: 200}
 
-		// Передаём обёртку в хендлер — он пишет через неё - READE
+		// Передаю обёртку в хендлер — он пишет через неё
 		next(rec, r)
 
 		logger.InfoContext(r.Context(),
@@ -113,8 +111,6 @@ func metricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"duration_ms", time.Since(start).Milliseconds(),
 		)
 
-		// TODO: посчитать duration, записать в histogram
-		// TODO: записать в counter с метками method, path, status
 		httpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, strconv.Itoa(rec.status)).Inc()
 		httpRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(time.Since(start).Seconds())
 	}
@@ -165,7 +161,7 @@ func main() {
 	http.Handle("/slow", otelhttp.NewHandler(metricsMiddleware(slowHandler), "GET /slow"))
 	http.Handle("/load", otelhttp.NewHandler(metricsMiddleware(loadHandler), "GET /load"))
 
-	// TODO: добавь эндпоинт /metrics через promhttp.Handler()
+	// добавлен эндпоинт /metrics через promhttp.Handler()
 	http.Handle("/metrics", promhttp.Handler())
 
 	logger.Info("server starting", "port", 8080)
