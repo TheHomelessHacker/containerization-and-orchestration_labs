@@ -143,7 +143,9 @@ spec:
       deny:
         conditions:
           any:
-          - key: "{{ request.object.spec.volumes[].hostPath | length(@) }}"
+          # Ищем только те элементы массива volumes, у которых есть поле hostPath.
+          # Если volumes нет, подставляем пустой массив [].
+          - key: "{{ request.object.spec.volumes[?hostPath] || `[]` | length(@) }}"
             operator: GreaterThan
             value: 0
 ---
