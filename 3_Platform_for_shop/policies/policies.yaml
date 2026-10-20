@@ -1,0 +1,202 @@
+# 1. Обязательные лимиты ресурсов
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-resources
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Ошибка: Обязательно указывать limits и requests для CPU и памяти."
+      pattern:
+        spec:
+          containers:
+          - resources:
+              limits:
+                memory: "?*"
+                cpu: "?*"
+              requests:
+                memory: "?*"
+                cpu: "?*"
+
+---
+# 2. Только доверенный реестр / локальные образы
+# (Разрешаем только образы, начинающиеся на 'shop-', чтобы запретить тянуть что угодно из интернета)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: validate-registries
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Ошибка: Разрешены только доверенные образы, начинающиеся на 'shop-'."
+      pattern:
+        spec:
+          containers:
+          - image: "shop-*"
+
+---
+# 3. Обязательные метки (чтобы понимать, чей это сервис)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-labels
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Ошибка: Обязательно наличие меток 'app' и 'owner' в metadata.labels."
+      pattern:
+        metadata:
+          labels:
+            app: "?*"
+            owner: "?*"
+
+---
+# 4. Запрет privileged-контейнеров (безопасность)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-privileged
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Ошибка: Использование 'privileged: true' запрещено."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.containers[].securityContext.privileged || `false` }}"
+            operator: AnyIn
+            value: [true]
+
+---
+# 5. Запрет тега 'latest' (для воспроизводимости)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: require-image-tag
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Ошибка: Использование тега 'latest' или его отсутствие запрещено. Укажите конкретную версию."
+      pattern:
+        spec:
+          containers:
+          - image: "!*:latest"
+---
+
+# № 6 - Запрет hostPath (защита от побега)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-hostpath
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-hostpath
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Ошибка: Использование hostPath запрещено (риск побега из контейнера)."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.volumes[].hostPath | length(@) }}"
+            operator: GreaterThan
+            value: 0
+---
+
+# № 7 - Запрет hostNetwork / hostPID (защита от доступа к сети/процессам хоста)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-host-namespaces
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-host-namespaces
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: "Ошибка: Использование hostNetwork и hostPID запрещено."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.hostNetwork || `false` }}"
+            operator: Equals
+            value: true
+          - key: "{{ request.object.spec.hostPID || `false` }}"
+            operator: Equals
+            value: true
+---
+
+# № 8 - Ограничение по количеству реплик, чтобы не съесть весь кластер
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: limit-replicas
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-replica-count
+    match:
+      any:
+      - resources:
+          kinds:
+          - Deployment
+          - StatefulSet
+    validate:
+      message: "Ошибка: Количество реплик не должно превышать 5 (защита ресурсов кластера)."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.replicas || `1` }}"
+            operator: GreaterThan
+            value: 5

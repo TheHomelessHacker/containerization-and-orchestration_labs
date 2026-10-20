@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-8
+  labels:
+    app: test
+    owner: me
+spec:
+  replicas: 10 # Наше правило разрешает максимум 5
+  selector:
+    matchLabels:
+      app: test
+  template:
+    metadata:
+      labels:
+        app: test
+        owner: me
+    spec:
+      containers:
+      - name: nginx
+        image: shop-api:1.0.0
+        resources:
+          limits: {cpu: "100m", memory: "128Mi"}
+          requests: {cpu: "100m", memory: "128Mi"}
