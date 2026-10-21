@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	_ "github.com/lib/pq"
 )
 
@@ -40,6 +42,7 @@ func main() {
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/order", orderHandler)
 	http.HandleFunc("/orders", ordersHandler)
+	http.Handle("/metrics", promhttp.Handler())
 
 	log.Println("API listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

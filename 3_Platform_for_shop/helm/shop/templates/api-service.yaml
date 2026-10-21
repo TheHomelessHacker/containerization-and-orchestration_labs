@@ -5,10 +5,21 @@ metadata:
   labels:
     app: shop-api
     owner: student
+
+# spec:
+#   type: ClusterIP
+#   selector:
+#     app: shop-api
+#   ports:
+#   - port: 8080
+#     targetPort: 8080
+
 spec:
-  type: ClusterIP
+  type: {{ .Values.service.type }}
   selector:
     app: shop-api
   ports:
-  - port: 8080
+  - name: http
+    port: {{ .Values.service.port }}
     targetPort: 8080
+    protocol: TCP
