@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-1
+  labels:
+    app: test
+    owner: me
+spec:
+  containers:
+  - name: nginx
+    image: shop-api:1.0.0

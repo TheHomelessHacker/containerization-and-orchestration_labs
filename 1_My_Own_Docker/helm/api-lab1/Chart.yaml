@@ -1,0 +1,5 @@
+apiVersion: v2
+name: api-lab1
+description: Lab 1 API — cgroups demo service
+version: 0.1.0
+appVersion: "1.0.0"

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-2
+  labels:
+    app: test
+    owner: me
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.21
+    resources:
+      limits: {cpu: "100m", memory: "128Mi"}
+      requests: {cpu: "100m", memory: "128Mi"}
