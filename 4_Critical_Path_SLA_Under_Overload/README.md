@@ -29,3 +29,28 @@ https://github.com/KeladKaal/containerization-and-orchestration/blob/main-rus/le
 1. В файлик для управления репликамидобавлена доп настройка `spreadMechanism: "topologySpread"` для api
 2. В шаблон для yaml файла был добавлен выбор параметр выбора между podAntiAffinity и topologySpreadConstraints
 ![](screenshots/part_1/2.png)
+
+# Часть 2 — Тесная площадка
+
+## 1. Создание 2-нодового кластера kind
+![](screenshots/part_2/3.png)
+Кластер создан
+
+## 2. Настройка кластера 
+1. Устанавка Kyverno и политик
+- Сюда переносяттся настрйоки политик из лабы 3 
+![](screenshots/part_2/4.png)
+Правила созданы
+2. Устанавливю стек мониторинга
+- Будет использоваться только такойже стек, что и в лабе 2
+! По поводу request/limits 
+В Kubernetes класс QoS Guaranteed (Гарантированный) присваивается поду только в том случае, если requests равны limits строго для CPU и для памяти.
+Если не поставить CPU limit (следуя лучшей практике с лекции), под получит класс Burstable (как batch). А в Части 7 нам как раз нужно, чтобы api (Guaranteed) не выселялся, а batch (Burstable) выселялся первым.
+
+Поэтому в рамках этой лабы CPU limit будут утсановлены так, чтобы получить статус Guaranteed и выполнить задание.
+
+3. Загружаю образы в соданный клсастер lab4
+![](screenshots/part_2/5.png)
+Образы попали в кластер
+
+4. Деплой чарта shop
