@@ -8,6 +8,7 @@ metadata:
 spec:
   instances: 1
   imageName: shop-postgres:15.5
+  priorityClassName: shop-critical
   
   # Прокидываю метки и ресурсы в поды, чтобы пройти Kyverno!
   inheritedMetadata:

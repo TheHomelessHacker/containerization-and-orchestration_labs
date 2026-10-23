@@ -16,6 +16,7 @@ spec:
         app: shop-api
         owner: student
     spec:
+      priorityClassName: shop-critical
       
       {{- if eq .Values.api.spreadMechanism "antiAffinity" }}
       affinity:

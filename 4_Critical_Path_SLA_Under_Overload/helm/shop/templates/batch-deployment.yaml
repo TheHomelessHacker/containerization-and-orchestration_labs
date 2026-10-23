@@ -16,6 +16,7 @@ spec:
         app: shop-batch
         owner: student
     spec:
+      priorityClassName: shop-batch
       containers:
         - name: batch
           image: "{{ .Values.batch.image.repository }}:{{ .Values.batch.image.tag }}"
