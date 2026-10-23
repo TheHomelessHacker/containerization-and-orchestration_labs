@@ -34,23 +34,57 @@ https://github.com/KeladKaal/containerization-and-orchestration/blob/main-rus/le
 
 ## 1. Создание 2-нодового кластера kind
 ![](screenshots/part_2/3.png)
-Кластер создан
+![](screenshots/part_2/6.png)
+Кластер создан и в нем две ноды `control-plane` и `worker`
 
-## 2. Настройка кластера 
-1. Устанавка Kyverno и политик
+## 2. Снятие taint
+Был снят taint с control-plane, так как без `kubectl taint nodes lab4-control-plane node-role.kubernetes.io/control-plane:NoSchedule-` поды api не смогли бы планироваться на control-plane, и spread был бы не 2 + 2, а 0 + 4.
+
+## 3. Установка инфраструктуры
+### 3.1 Kyverno + policies
+Устанавка Kyverno и политик
 - Сюда переносяттся настрйоки политик из лабы 3 
-![](screenshots/part_2/4.png)
-Правила созданы
-2. Устанавливю стек мониторинга
-- Будет использоваться только такойже стек, что и в лабе 2
-! По поводу request/limits 
-В Kubernetes класс QoS Guaranteed (Гарантированный) присваивается поду только в том случае, если requests равны limits строго для CPU и для памяти.
-Если не поставить CPU limit (следуя лучшей практике с лекции), под получит класс Burstable (как batch). А в Части 7 нам как раз нужно, чтобы api (Guaranteed) не выселялся, а batch (Burstable) выселялся первым.
+![](screenshots/part_2/10.png)
+Правила созданы и готовы к работе 
 
-Поэтому в рамках этой лабы CPU limit будут утсановлены так, чтобы получить статус Guaranteed и выполнить задание.
+## 3.2 CNPG (postgres-кластер)
+`helm upgrade --install cnpg cnpg/cloudnative-pg -n cnpg-system --create-namespace`
+![](screenshots/part_2/11.png)
+-> Cluster Ready, PVC создан
 
-3. Загружаю образы в соданный клсастер lab4
+### 3.3. kube-prometheus-stack (мониторинг)
+Будет использоваться только такойже стек, что и в лабе 2
+```
+helm upgrade --install kps prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace -f helm/monitoring/values.yaml
+```
+
+## 4. Сборка и загрузка образов в kind
 ![](screenshots/part_2/5.png)
 Образы попали в кластер
 
-4. Деплой чарта shop
+## 5. Добавление шаблона batch в чарт shop
+В чарт добавлен templates/batch-deployment.yaml + блок batch в values.yaml
+
+## 6. Деплой чарта shop
+`kubectl create namespace shop`
+![](screenshots/part_2/8.png)
+-> 8 подов shop, shop-api раскидан 2+2 по нодам.
+
+## 7. Проверки состояния
+### 7.1 Helm-релизы (вся инфраструктура)
+![](screenshots/part_2/7.png)
+-> 4 релиза: cnpg, kps, kyverno, shop
+
+### 7.2 Сервисы
+![](screenshots/part_2/9.png)
+
+### 7.3 Мониторинг (Prometheus/Grafana/Alertmanager)
+![](screenshots/part_2/13.png)
+-> видно, что shop-api ServiceMonitor есть и все инструменты готовы к работе
+
+### 7.4 По поводу request/limits 
+В Kubernetes класс QoS Guaranteed (Гарантированный) присваивается поду только в том случае, если requests равны limits строго для CPU и для памяти.
+Если не поставить CPU limit (следуя лучшей практике с лекции), под получит класс Burstable (как batch). А в Части 7 нам как раз нужно, чтобы api (Guaranteed) не выселялся, а batch (Burstable) выселялся первым. Поэтому в рамках этой лабы CPU limit будут утсановлены так, чтобы получить статус Guaranteed и выполнить задание.
+![](screenshots/part_2/12.png)
+! все Burstable (в части 5 сделаем api/postgres Guaranteed).

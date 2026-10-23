@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-batch
+  labels:
+    app: shop-batch
+    owner: student
+spec:
+  replicas: {{ .Values.batch.replicaCount }}
+  selector:
+    matchLabels:
+      app: shop-batch
+  template:
+    metadata:
+      labels:
+        app: shop-batch
+        owner: student
+    spec:
+      containers:
+        - name: batch
+          image: "{{ .Values.batch.image.repository }}:{{ .Values.batch.image.tag }}"
+          imagePullPolicy: {{ .Values.batch.image.pullPolicy }}
+          env:
+            - name: CPU_INTENSITY
+              value: "{{ .Values.batch.env.CPU_INTENSITY }}"
+            - name: MEM_MB
+              value: "{{ .Values.batch.env.MEM_MB }}"
+          resources:
+            {{- toYaml .Values.batch.resources | nindent 12 }}
