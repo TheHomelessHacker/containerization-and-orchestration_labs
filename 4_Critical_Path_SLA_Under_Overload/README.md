@@ -183,3 +183,45 @@ docker run --rm -it --network host -e LANG=C.UTF-8   -v ~/.kube:/root/.kube   us
 -  `2m46s       Normal    Preempted           pod/shop-batch-load-1-68c986547-tvct6    Preempted by pod d13b4bd5-ecc6-486b-ac8a-d4388f3c0081 on node lab4-control-plane`
 - `found a potential placement for pod on node lab4-control-plane, preempting 1 victims` 
 И это значит, что что планировщик увидел: `shop-api-extra` (приоритет 1000000) не влезает. Он нашел ноду `lab4-control-plane`, где стоит `shop-batch-load-1` (приоритет 1000), принес его в жертву (1 victims) и запустил api на его месте.
+
+# Часть 7 — Давление по памяти, порядок жертв
+## 1. PDB
+Выполнил drain `kubectl drain lab4-worker --ignore-daemonsets --delete-emptydir-data --force`, чтобы искусственно вызвать добровольное вытеснение (Voluntary Eviction) и показать, как работают настройки SLA. При запускеKubernetes делает три шага:
+- `Cordon (Ограждение)`:
+Он вешает на ноду табличку «Больше не принимать новые поды» (статус SchedulingDisabled). Планировщик сразу перестает ставить туда новые поды.
+- `Evict (Выселение)`:
+Kubelet начинает по одному аккуратно удалять (выселять) поды с этой ноды.
+- `Rescheduling (Переселение)`:
+Так как поды удаляются из-под контроля Deployment (ReplicaSet), Kubernetes автоматически создает точно такие же поды, но уже на других свободных нодах (на control-plane). 
+
+ДО первого `drain`
+![](screenshots/part_2/8.png)
+-> Все 8 подов `Running`. На ноде worker сидят: 2 пода api, 1 postgres, 1 worker. На control-plane: 2 пода api, 1 batch, 1 worker
+
+ПОСЛЕ первого `drain`
+![](screenshots/part_7/25.png)
+- `kubectl drain` сработал Нода  `lab4-worker` перешла в статус `SchedulingDisabled`
+- `shop-batch` (Burstable, без PDB) — выселился моментально и уехал на control-plane (под `ddpc6`)
+- `shop-api`: Один под выселился. Второй под (`tlcn6`) остался на worker'е, потому что PDB (minAvailable: 3) сказал: «Если ты убьешь и его, останется всего 2 api. Я запрещаю».
+- `shop-postgres-1`: Остался на worker'е. Оператор CNPG (PDB) запретил его выселять.
+- `shop-api (vj7n2)` находится в статусе Error, а не Pending. Это случилось потому, что вы нажали Ctrl+C (прервали drain), и под не успел корректно переехать, «сломавшись» при завершении.
+
+ДО второго `drain`
+![](screenshots/part_6/26.png)
+- После пересоздания упавших подов кластер вернулся в норму, но `batch` уже находился на `control-plane`.
+
+ПОСЛЕ
+![](screenshots/part_6/27.png)
+- `shop-worker`: Успешно выселился с worker'а и переехал на control-plane (под `lmthk`).
+- `shop-api` в Pending: Так как нода worker закрыта на прием (SchedulingDisabled), а на control-plane уже нет места (там висят api, worker, batch и туда приехал новый worker), планировщик не может найти дом для выселенного пода api.
+
+## Анализ логов (Почему это успех)
+Как только `drain` дошел до базы (`shop-postgres-1`) и второго пода `api` (`tlcn6`), сработал `PodDisruptionBudget`. В логах четко видно:
+`error when evicting pods/"shop-postgres-1" ... Cannot evict pod as it would violate the pod's disruption budget.`
+`error when evicting pods/"shop-api-..." ... Cannot evict pod as it would violate the pod's disruption budget.`
+
+**Вывод:** Настроенный SLA сработал идеально. PDB **заблокировал** вытеснение критических подов, чтобы сохранить доступность сервисов. `drain` завис в бесконечных попытках их убить, поэтому я прервал его (`Ctrl+C`) и вернул ноду в строй (`kubectl uncordon lab4-worker`).
+
+## 2. Давление по памяти (MemoryPressure)
+
+## 3. Разница с OOMKilled
