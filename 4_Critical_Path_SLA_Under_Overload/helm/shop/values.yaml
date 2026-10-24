@@ -28,6 +28,9 @@ worker:
       cpu: "10m"
 
 batch:
+  env:
+    CPU_INTENSITY: "1000000"
+    MEM_MB: "20"
   replicaCount: 1
   image:
     repository: shop-batch
@@ -40,9 +43,7 @@ batch:
     limits:
       cpu: "500m"
       memory: "256Mi"
-  env:
-    CPU_INTENSITY: "1000000"
-    MEM_MB: "20"
+
 
 service:
   type: ClusterIP

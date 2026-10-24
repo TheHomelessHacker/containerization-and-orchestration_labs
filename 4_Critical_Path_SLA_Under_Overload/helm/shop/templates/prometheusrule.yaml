@@ -4,6 +4,7 @@ metadata:
   name: {{ .Release.Name }}-alerts
   labels:
     app: shop-api
+    release: kps
     owner: student
 spec:
   groups:
