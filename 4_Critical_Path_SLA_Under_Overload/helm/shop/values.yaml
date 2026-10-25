@@ -1,0 +1,50 @@
+api:
+  replicaCount: 4
+  spreadMechanism: "topologySpread" 
+  image:
+    repository: shop-api
+    tag: "1.0.0"
+  resources:
+    requests:
+      memory: "100Mi"
+      cpu: "25m"
+    limits:
+      memory: "100Mi"
+      cpu: "25m"
+  env:
+    HEALTH_FAIL: "false"
+
+worker:
+  replicaCount: 2
+  image:
+    repository: shop-worker
+    tag: "1.0.0"
+  resources:
+    requests:
+      memory: "100Mi"
+      cpu: "10m"
+    limits:
+      memory: "100Mi"
+      cpu: "10m"
+
+batch:
+  env:
+    CPU_INTENSITY: "1000000"
+    MEM_MB: "20"
+  replicaCount: 1
+  image:
+    repository: shop-batch
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+
+service:
+  type: ClusterIP
+  port: 8080

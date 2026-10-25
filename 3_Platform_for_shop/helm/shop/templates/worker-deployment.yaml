@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+  labels:
+    app: shop-worker
+    owner: student
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app: shop-worker
+  template:
+    metadata:
+      labels:
+        app: shop-worker
+        owner: student
+    spec:
+      containers:
+      - name: worker
+        image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DATABASE_URL
+          value: "postgres://app:password@{{ .Release.Name }}-postgres-rw:5432/app?sslmode=disable"
+        resources:
+{{ toYaml .Values.worker.resources | indent 10 }}

@@ -1,0 +1,213 @@
+# 1. Обязательные лимиты ресурсов
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-resources
+    match:
+      any:
+      - resources:
+          kinds: [Pod]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Обязательно указывать limits и requests для CPU и памяти."
+      pattern:
+        spec:
+          containers:
+          - resources:
+              limits: {memory: "?*", cpu: "?*"}
+              requests: {memory: "?*", cpu: "?*"}
+---
+# 2. Только доверенный реестр
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: validate-registries
+    match:
+      any:
+      - resources:
+          kinds: [Pod]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Разрешены только доверенные образы, начинающиеся на 'shop-'."
+      pattern:
+        spec:
+          containers:
+          - image: "shop-*"
+---
+# 3. Обязательные метки
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-labels
+    match:
+      any:
+      - resources:
+          kinds: [Pod]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Обязательно наличие меток 'app' и 'owner' в metadata.labels."
+      pattern:
+        metadata:
+          labels:
+            app: "?*"
+            owner: "?*"
+---
+# 4. Запрет privileged-контейнеров
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-privileged
+    match:
+      any:
+      - resources:
+          kinds: [Pod]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Использование 'privileged: true' запрещено."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.containers[].securityContext.privileged || `[]` }}"
+            operator: AnyIn
+            value: [true]
+---
+# 5. Запрет тега 'latest'
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: require-image-tag
+    match:
+      any:
+      - resources:
+          kinds: [Pod]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Использование тега 'latest' запрещено."
+      pattern:
+        spec:
+          containers:
+          - image: "!*:latest"
+---
+# 6. Запрет hostPath
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-hostpath
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-hostpath
+    match:
+      any:
+      - resources:
+          kinds: [Pod]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Использование hostPath запрещено."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.volumes[?hostPath] || `[]` | length(@) }}"
+            operator: GreaterThan
+            value: 0
+---
+# 7. Запрет hostNetwork / hostPID
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-host-namespaces
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-host-namespaces
+    match:
+      any:
+      - resources:
+          kinds: [Pod]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Использование hostNetwork и hostPID запрещено."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.hostNetwork || `false` }}"
+            operator: Equals
+            value: true
+          - key: "{{ request.object.spec.hostPID || `false` }}"
+            operator: Equals
+            value: true
+---
+# 8. Ограничение по количеству реплик
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: limit-replicas
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  - name: check-replica-count
+    match:
+      any:
+      - resources:
+          kinds: [Deployment, StatefulSet]
+    exclude:
+      any:
+      - resources:
+          namespaces: [kube-system, cnpg-system, kyverno, monitoring, local-path-storage]
+    validate:
+      message: "Ошибка: Количество реплик не должно превышать 5."
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.replicas || `1` }}"
+            operator: GreaterThan
+            value: 5
