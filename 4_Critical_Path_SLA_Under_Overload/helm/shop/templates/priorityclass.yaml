@@ -1,0 +1,16 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: shop-critical
+value: 1000000
+globalDefault: false
+description: "Critical path (api, postgres) - not evicted first"
+---
+
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: shop-batch
+value: 1000
+globalDefault: false
+description: "Batch jobs - evicted first"

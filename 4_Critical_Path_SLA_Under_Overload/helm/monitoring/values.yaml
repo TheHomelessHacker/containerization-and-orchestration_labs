@@ -1,0 +1,81 @@
+prometheus:
+  prometheusSpec:
+    retention: 6h
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
+    
+    resources:
+      requests:
+        memory: 256Mi 
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+    
+    # размер PVC для метрик.
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 5Gi
+
+grafana:
+  adminPassword: "admin"
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 200m
+  
+  service:
+    type: ClusterIP  # доступ через port-forward
+  # persistence — для лабы можно false (данные Grafana не критичны)
+  persistence:
+    enabled: false
+  
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki-gateway.monitoring.svc.cluster.local
+      isDefault: false
+      jsonData:
+        maxLines: 1000
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 50m
+      limits:
+        memory: 128Mi
+        cpu: 100m
+
+# === ОТКЛЮЧАЕМ НЕНУЖНЫЕ SCRAPE ===
+# В kind нет доступа к etcd/kube-proxy/scheduler как к отдельным таргетам
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: true
+kubeControllerManager:
+  enabled: false
+coreDns:
+  enabled: false

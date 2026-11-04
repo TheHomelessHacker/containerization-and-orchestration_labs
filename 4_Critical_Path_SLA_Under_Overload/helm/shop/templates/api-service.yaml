@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    app: shop-api
+    owner: student
+
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: shop-api
+  ports:
+  - name: http
+    port: {{ .Values.service.port }}
+    targetPort: 8080
+    protocol: TCP
