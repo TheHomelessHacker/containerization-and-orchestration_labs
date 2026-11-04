@@ -1,0 +1,48 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-lab1-alerts
+  labels:
+    app: api-lab1
+spec:
+  groups:
+  - name: api-lab1.rules
+    interval: 30s
+    rules:
+    
+    - alert: ApiLab1MemoryNearLimit
+      expr: |
+        sum(container_memory_working_set_bytes{container="api-lab1"})
+        /
+        sum(kube_pod_container_resource_limits{container="api-lab1",resource="memory"})
+        > 0.9
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: "api-lab1: память > 90% лимита"
+        description: "Контейнер использует {{ `{{ $value | humanizePercentage }}` }} от лимита. Скоро OOM."
+
+    - alert: ApiLab1CPUThrottling
+      expr: |
+        sum(rate(container_cpu_cfs_throttled_periods_total{container="api-lab1"}[5m]))
+        /
+        sum(rate(container_cpu_cfs_periods_total{container="api-lab1"}[5m]))
+        > 0.3
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "api-lab1: CPU throttling > 30%"
+        description: "Контейнер упирается в CPU-лимит {{ `{{ $value | humanizePercentage }}` }} периодов. Стоит увеличить CPU."
+
+
+    - alert: ApiLab1OOMKilled
+      expr: |
+        kube_pod_container_status_last_terminated_reason{container="api-lab1",reason="OOMKilled"} > 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "api-lab1: OOMKilled"
+        description: "Контейнер убит по OOM. Под перезапускается. Увеличить memory limit или починить утечку."

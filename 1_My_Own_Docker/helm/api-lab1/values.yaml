@@ -1,0 +1,19 @@
+replicaCount: 1
+
+image:
+  repository: api-lab1
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+# лимиты нужны, чтобы cAdvisor создавал throttling-метрики
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "200m"
+  limits:
+    memory: "128Mi"      # маленький лимит — легко поймать OOM через /eat
+    cpu: "300m"          # 0.3 ядра — легко поймать throttling через /burn
