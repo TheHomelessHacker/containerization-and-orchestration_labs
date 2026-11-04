@@ -1,0 +1,62 @@
+controller:
+  type: daemonset
+
+alloy:
+  configMap:
+    create: true
+    content: |-
+      // 1. Обнаружение подов через API k8s
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      // 2. Переименование labels из k8s-формата в удобный
+      discovery.relabel "pods" {
+        targets = discovery.kubernetes.pods.targets
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_node_name"]
+          target_label  = "node"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "app"
+        }
+      }
+
+      // 3. Чтение логов подов через k8s API
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pods.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      // 4. Отправка логов в Loki
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+
+  # RBAC — Alloy должен читать поды
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 200m
+
+# RBAC для доступа к API k8s
+rbac:
+  create: true

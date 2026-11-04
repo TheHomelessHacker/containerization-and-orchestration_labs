@@ -1,0 +1,15 @@
+replicaCount: 1
+
+image:
+  repository: api-monitoring
+  tag: latest
+  pullPolicy: IfNotPresent
+
+otel:
+  endpoint: "jaeger.monitoring.svc.cluster.local:4317"
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources: {}

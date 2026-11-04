@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: karma-config
+  namespace: monitoring
+data:
+  karma.yaml: |
+    alertmanager:
+      servers:
+        - name: kps
+          uri: http://kps-kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+          timeout: 10s
+    listen:
+      address: 0.0.0.0
+      port: 8080
+    log:
+      level: info
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karma
+  namespace: monitoring
+  labels:
+    app: karma
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: karma
+  template:
+    metadata:
+      labels:
+        app: karma
+    spec:
+      containers:
+      - name: karma
+        image: ghcr.io/prymitive/karma:latest
+        args: ["--config.file=/etc/karma/karma.yaml"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: config
+          mountPath: /etc/karma
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 50m
+          limits:
+            memory: 128Mi
+            cpu: 200m
+      volumes:
+      - name: config
+        configMap:
+          name: karma-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: karma
+  namespace: monitoring
+  labels:
+    app: karma
+spec:
+  type: ClusterIP
+  selector:
+    app: karma
+  ports:
+  - port: 8080
+    targetPort: 8080

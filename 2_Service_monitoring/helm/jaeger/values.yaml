@@ -1,0 +1,26 @@
+provisionDataStore:
+  cassandra: false
+  elasticsearch: false
+
+storage:
+  type: memory          # in-memory storage — для лабы
+
+allInOne:
+  enabled: true      # включён OTLP-приёмник
+  replicas: 1
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+agent:
+  enabled: false        # не нужен — OTLP идёт напрямую в collector
+
+collector:
+  enabled: false        # в all-in-one он встроен
+
+query:
+  enabled: false        # тоже встроен
