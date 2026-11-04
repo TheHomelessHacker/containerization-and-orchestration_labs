@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}-postgres
+  labels:
+    app: shop-postgres
+    owner: student
+spec:
+  instances: 1
+  imageName: shop-postgres:15.5
+  
+  # Прокидываю метки и ресурсы в поды, чтобы пройти Kyverno!
+  inheritedMetadata:
+    labels:
+      app: shop-postgres
+      owner: student
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  storage:
+    size: 1Gi

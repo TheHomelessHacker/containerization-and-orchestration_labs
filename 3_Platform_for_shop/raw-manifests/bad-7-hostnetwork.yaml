@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-7
+  labels:
+    app: test
+    owner: me
+spec:
+  hostNetwork: true # Пытаемся использовать сеть хоста
+  containers:
+  - name: nginx
+    image: shop-api:1.0.0
+    resources:
+      limits: {cpu: "100m", memory: "128Mi"}
+      requests: {cpu: "100m", memory: "128Mi"}

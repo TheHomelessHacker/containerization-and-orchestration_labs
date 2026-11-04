@@ -1,0 +1,70 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-alerts
+  labels:
+    app: shop-api
+    owner: student
+spec:
+  groups:
+  - name: shop.rules
+    interval: 30s
+    rules:
+    
+    # 1. Доступность (RED)
+    - alert: ApiDown
+      expr: (up{job=~"{{ .Release.Name }}-api.*"} == 0) or absent(up{job=~"{{ .Release.Name }}-api.*"})
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "API недоступен"
+        description: "Prometheus не может скрейпить api более 1 минуты."
+
+    # 2. Память (USE)
+    - alert: ApiHighMemoryUsage
+      expr: |
+        sum(container_memory_working_set_bytes{container="api"}) 
+        / 
+        sum(kube_pod_container_resource_limits{container="api",resource="memory"}) 
+        > 0.9
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "API близок к лимиту памяти"
+        description: "Контейнер api использует более 90% от лимита памяти."
+
+    # 3. Процессор (USE)
+    - alert: ApiHighCPUThrottling
+      expr: |
+        sum(rate(container_cpu_cfs_throttled_periods_total{container="api"}[5m])) 
+        / 
+        sum(rate(container_cpu_cfs_periods_total{container="api"}[5m])) 
+        > 0.3
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "API упирается в лимит CPU"
+        description: "Контейнер api более 30% времени throttled."
+
+    # 4. Стабильность (K8s)
+    - alert: PodRestartingTooMuch
+      expr: increase(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}"}[15m]) > 3
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Под часто перезапускается"
+        description: "Под {{ "{{$labels.pod}}" }} перезапускался более 3 раз за 15 минут."
+
+    # 5. База данных (DB)
+    - alert: PostgresHighConnections
+      expr: sum(pg_stat_activity_count{datname="app"}) > 1
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Много подключений к Postgres"
+        description: "Количество активных подключений к базе app превышает 80."
